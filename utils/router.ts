@@ -44,13 +44,13 @@ export class Router {
 		const params: Record<string, string> = {};
 
 		for (let i = 0; i < routeSegments.length; i++) {
-			const routeSegment = routeSegments[i];
+			const routeSegment: any = routeSegments[i];
 			const pathSegment = pathSegments[i];
 
 			if (routeSegment.startsWith(':')) {
 				// Dynamic segment
 				const paramName = routeSegment.slice(1);
-				params[paramName] = pathSegment;
+				params[paramName as any] = pathSegment as any;
 			} else if (routeSegment !== pathSegment) {
 				// Static segment mismatch
 				return null;
