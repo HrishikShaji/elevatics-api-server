@@ -19,14 +19,10 @@ RUN bunx prisma generate
 # Copy the rest of the source code
 COPY . .
 
-# Create a non-root user for security (Ubuntu/Debian commands)
-RUN groupadd -r -g 1001 nodejs && \
-    useradd -r -u 1001 -g nodejs -m -s /bin/bash bun
+# Change ownership of the app directory to the existing bun user
+RUN chown -R bun:bun /app
 
-# Change ownership of the app directory to the bun user
-RUN chown -R bun:nodejs /app
-
-# Switch to the non-root user
+# Switch to the non-root user (bun user already exists in the base image)
 USER bun
 
 # Expose the port the app runs on
