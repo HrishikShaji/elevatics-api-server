@@ -6,14 +6,8 @@ export class AgentsController {
 	// GET /api/agents
 	static async getAgents(url: URL): Promise<Response> {
 		try {
-			const isActive = url.searchParams.get('isActive');
-			const name = url.searchParams.get('name');
 
 			const agents = await prisma.agent.findMany({
-				where: {
-					...(isActive && { isActive: isActive === 'true' }),
-					...(name && { name: { contains: name, mode: 'insensitive' } }),
-				},
 				include: {
 					_count: {
 						select: {
