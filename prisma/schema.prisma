@@ -1,0 +1,248 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+ 
+enum Role {
+  USER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum Status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String          @unique
+  password      String?
+  emailVerified DateTime?
+  image         String?
+  role          Role            @default(USER)
+  accounts      Account[]
+  sessions      Session[]
+  Authenticator Authenticator[]
+  conversations Conversation[]
+  messages      Message[] 
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+ 
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([provider, providerAccountId])
+}
+ 
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+ 
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+ 
+  @@id([identifier, token])
+}
+ 
+model Authenticator {
+  credentialID         String  @unique
+  userId               String
+  providerAccountId    String
+  credentialPublicKey  String
+  counter              Int
+  credentialDeviceType String
+  credentialBackedUp   Boolean
+  transports           String?
+ 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+ 
+  @@id([userId, credentialID])
+}
+
+model Agent {
+  id            String   @id @default(cuid())
+  name          String   @unique // e.g., "customer-support", "sales-assistant", "technical-help"
+  displayName   String   // e.g., "Customer Support Bot", "Sales Assistant", "Technical Helper"
+  description   String?
+  avatar        String?  // Agent avatar URL
+  model         String?  // Default AI model (gpt-4, claude-3, etc.)
+  systemPrompt  String?  // Agent's system prompt/personality
+  capabilities  String[]    // Agent capabilities and configuration
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relationships
+  conversations Conversation[]
+  messages      Message[]
+  analytics     ChatAnalytics[]
+  
+  @@index([name])
+  @@index([isActive])
+  @@map("agents")
+}
+
+model Conversation {
+  id          String   @id @default(cuid())
+  title       String?  // Optional title for the conversation
+  summary     String?  // Optional AI-generated summary
+  status      ConversationStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Foreign keys
+  userId      String
+  agentId     String   // Which agent is handling this conversation
+  
+  // Relationships
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  messages    Message[]
+  
+  // Indexes for better performance
+  @@index([userId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@index([status])
+  @@index([userId, agentId]) // Composite index for user-agent queries
+  @@map("conversations")
+}
+
+model Message {
+  id            String      @id @default(cuid())
+  content       String
+  role          MessageRole
+  tokens        Int?        // Token count for AI messages
+  model         String?     // AI model used (gpt-4, claude-3, etc.)
+  finishReason  String?     // AI completion reason
+  metadata      Json?       // Additional metadata (attachments, etc.)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Foreign keys
+  conversationId String
+  userId         String
+  agentId        String      // Which agent generated this message (for ASSISTANT messages)
+  
+  // Relationships
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agent          Agent        @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  
+  // Indexes for better performance
+  @@index([conversationId])
+  @@index([userId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@index([role])
+  @@index([conversationId, agentId]) // Composite index for conversation-agent queries
+  @@map("messages")
+}
+
+model ChatSession {
+  id            String   @id @default(cuid())
+  sessionId     String   @unique // For anonymous users
+  ipAddress     String?
+  userAgent     String?
+  lastActivity  DateTime @default(now())
+  createdAt     DateTime @default(now())
+  
+  // For tracking anonymous conversations
+  conversationCount Int @default(0)
+  messageCount      Int @default(0)
+  
+  @@index([sessionId])
+  @@index([lastActivity])
+  @@map("chat_sessions")
+}
+
+// Enums
+enum ConversationStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// Optional: Analytics table for tracking usage per agent
+model ChatAnalytics {
+  id              String   @id @default(cuid())
+  date            DateTime @default(now())
+  agentId         String  // Track analytics per agent
+  totalMessages   Int      @default(0)
+  totalTokens     Int      @default(0)
+  uniqueUsers     Int      @default(0)
+  averageMessages Float    @default(0)
+  
+  // Relationships
+  agent           Agent   @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  
+  @@unique([date, agentId])
+  @@index([agentId])
+  @@map("chat_analytics")
+}
+
+
+model Log {
+  id          String   @id @default(cuid())
+  startTime   String   
+  endTime     String?  
+  duration    Int?     
+  url         String
+  method      String   
+  ip          String
+  platform    String
+  ua          String   
+  statusCode  Int?     
+  success     Boolean? 
+  errorMessage String? 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
