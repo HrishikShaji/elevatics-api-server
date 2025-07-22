@@ -6,20 +6,112 @@ export class AgentsController {
 	// GET /api/agents
 	static async getAgents(url: URL): Promise<Response> {
 		try {
+			// Debug logging to understand what's being passed
+			console.log('URL object:', url);
+			console.log('URL type:', typeof url);
+			console.log('URL searchParams:', url?.searchParams);
 
-			const agents = await prisma.agent.findMany({
-				include: {
-					_count: {
-						select: {
-							conversations: true,
-							messages: true,
+			// Handle case where url might be a string or malformed
+			let searchParams: URLSearchParams;
+
+			if (url instanceof URL) {
+				searchParams = url.searchParams;
+			} else if (typeof url === 'string') {
+				const urlObj = new URL(url);
+				searchParams = urlObj.searchParams;
+			} else {
+				// If url is actually a Request object or something else
+				const urlObj = new URL((url as any)?.url || url);
+				searchParams = urlObj.searchParams;
+			}
+
+			// Extract pagination parameters
+			const page = parseInt(searchParams.get('page') || '1');
+			const limit = parseInt(searchParams.get('limit') || '12');
+			const skip = (page - 1) * limit;
+
+			// Extract filter parameters
+			const search = searchParams.get('search') || '';
+			const isActive = searchParams.get('filter'); // 'active', 'inactive', or 'all'
+			const sort = searchParams.get('sort') || 'createdAt';
+			const order = searchParams.get('order') || 'desc';
+
+			// Build where clause
+			const where: any = {};
+
+			// Search filter (searches in name, displayName, and description)
+			if (search) {
+				where.OR = [
+					{ name: { contains: search, mode: 'insensitive' } },
+					{ displayName: { contains: search, mode: 'insensitive' } },
+					{ description: { contains: search, mode: 'insensitive' } }
+				];
+			}
+
+			// Active/Inactive filter
+			if (isActive && isActive !== 'all') {
+				where.isActive = isActive === 'active';
+			}
+
+			// Build orderBy clause based on your schema fields
+			const getOrderBy = (sortField: string, sortOrder: string) => {
+				const orderObj: any = {};
+				switch (sortField) {
+					case 'displayName':
+						orderObj.displayName = sortOrder;
+						break;
+					case 'createdAt':
+						orderObj.createdAt = sortOrder;
+						break;
+					case 'updatedAt':
+						orderObj.updatedAt = sortOrder;
+						break;
+					default:
+						orderObj.createdAt = 'desc';
+				}
+				return orderObj;
+			};
+
+			const orderBy = getOrderBy(sort, order);
+
+			// Execute queries in parallel for better performance
+			const [agents, totalAgents] = await Promise.all([
+				prisma.agent.findMany({
+					where,
+					orderBy,
+					skip,
+					take: limit,
+					include: {
+						_count: {
+							select: {
+								conversations: true,
+								messages: true,
+							},
 						},
 					},
-				},
-				orderBy: { createdAt: 'desc' },
-			});
+				}),
+				prisma.agent.count({ where })
+			]);
 
-			return Response.json(agents);
+			// Calculate pagination metadata
+			const totalPages = Math.ceil(totalAgents / limit);
+			const hasNext = page < totalPages;
+			const hasPrev = page > 1;
+
+			// Transform data to match your frontend expectations
+			const response = {
+				agents,
+				pagination: {
+					currentPage: page,
+					totalPages,
+					totalAgents,
+					hasNext,
+					hasPrev,
+					limit
+				}
+			};
+
+			return Response.json(response);
 		} catch (error) {
 			console.error('Error fetching agents:', error);
 			return Response.json(
