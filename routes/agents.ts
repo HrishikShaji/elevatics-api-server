@@ -27,15 +27,19 @@ export class AgentsController {
 
 			// Extract pagination parameters
 			const page = parseInt(searchParams.get('page') || '1');
-			const limit = parseInt(searchParams.get('limit') || '12');
+			const limit = parseInt(searchParams.get('pageSize') || '12');
 			const skip = (page - 1) * limit;
+
+			console.log("LIMIT", limit)
 
 			// Extract filter parameters
 			const search = searchParams.get('search') || '';
-			const isActive = searchParams.get('filter'); // 'active', 'inactive', or 'all'
+			const status = searchParams.get('status'); // 'active', 'inactive', or 'all'
 			const sort = searchParams.get('sort') || 'createdAt';
 			const order = searchParams.get('order') || 'desc';
 
+			console.log("@@SORT", sort)
+			console.log("@@ORDER", order)
 			// Build where clause
 			const where: any = {};
 
@@ -49,13 +53,14 @@ export class AgentsController {
 			}
 
 			// Active/Inactive filter
-			if (isActive && isActive !== 'all') {
-				where.isActive = isActive === 'active';
+			if (status && status !== 'all') {
+				where.isActive = status === 'active';
 			}
 
 			// Build orderBy clause based on your schema fields
 			const getOrderBy = (sortField: string, sortOrder: string) => {
 				const orderObj: any = {};
+
 				switch (sortField) {
 					case 'displayName':
 						orderObj.displayName = sortOrder;
@@ -69,6 +74,7 @@ export class AgentsController {
 					default:
 						orderObj.createdAt = 'desc';
 				}
+
 				return orderObj;
 			};
 
@@ -99,15 +105,14 @@ export class AgentsController {
 			const hasPrev = page > 1;
 
 			// Transform data to match your frontend expectations
+
 			const response = {
-				agents,
+				data: agents,
 				pagination: {
-					currentPage: page,
-					totalPages,
-					totalAgents,
-					hasNext,
-					hasPrev,
-					limit
+					page,
+					pageSize: limit,
+					total: totalAgents,
+					totalPages
 				}
 			};
 
