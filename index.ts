@@ -5,15 +5,8 @@ const router = new Router();
 
 // Register routes
 router.add('GET', '/api/agents', AgentsController.getAgents);
-router.add('POST', '/api/agents', AgentsController.createAgent);
 router.add('GET', '/api/agents/:id', (req: Request, url: URL, params: any) =>
 	AgentsController.getAgent(params.id)
-);
-router.add('PUT', '/api/agents/:id', (req: Request, url: URL, params: any) =>
-	AgentsController.updateAgent(params.id, req)
-);
-router.add('DELETE', '/api/agents/:id', (req: Request, url: URL, params: any) =>
-	AgentsController.deleteAgent(params.id)
 );
 
 const server = Bun.serve({

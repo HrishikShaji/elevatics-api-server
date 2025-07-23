@@ -126,45 +126,26 @@ export class AgentsController {
 		}
 	}
 
-	// POST /api/agents
-	static async createAgent(req: Request): Promise<Response> {
-		try {
-			const body: any = await req.json();
-
-			const agent = await prisma.agent.create({
-				data: {
-					name: body.name,
-					displayName: body.displayName,
-					description: body.description,
-					avatar: body.avatar,
-					model: body.model,
-					systemPrompt: body.systemPrompt,
-					capabilities: body.capabilities || [],
-					isActive: body.isActive ?? true,
-				},
-			});
-
-			return Response.json(agent, { status: 201 });
-		} catch (error) {
-			console.error('Error creating agent:', error);
-			return Response.json(
-				{ error: 'Failed to create agent' },
-				{ status: 500 }
-			);
-		}
-	}
-
 	// GET /api/agents/:id
 	static async getAgent(id: string): Promise<Response> {
 		try {
 			const agent = await prisma.agent.findUnique({
 				where: { id },
 				include: {
-					_count: {
-						select: {
-							conversations: true,
-							messages: true,
+					conversations: {
+						include: {
+							user: true,
+							_count: {
+								select: {
+									messages: true,
+								},
+							},
 						},
+						orderBy: { updatedAt: 'desc' },
+					},
+					analytics: {
+						orderBy: { date: 'desc' },
+						take: 30,
 					},
 				},
 			});
