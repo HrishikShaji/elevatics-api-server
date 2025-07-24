@@ -1,4 +1,6 @@
 import { AgentsController } from './routes/agents';
+import { AnalyticsController } from './routes/analytics';
+import { LogsController } from './routes/logs';
 import { Router } from './utils/router';
 
 const router = new Router();
@@ -8,6 +10,9 @@ router.add('GET', '/api/agents', AgentsController.getAgents);
 router.add('GET', '/api/agents/:id', (req: Request, url: URL, params: any) =>
 	AgentsController.getAgent(params.id)
 );
+router.add('GET', '/api/logs', LogsController.getLogs);
+router.add('GET', '/api/analytics', AnalyticsController.getAnalytics);
+
 
 const server = Bun.serve({
 	port: 3000,
