@@ -13,10 +13,9 @@ router.add('GET', '/api/agents/:id', (req: Request, url: URL, params: any) =>
 router.add('GET', '/api/logs', LogsController.getLogs);
 router.add('GET', '/api/analytics', AnalyticsController.getAnalytics);
 
-
 const server = Bun.serve({
 	port: 3000,
-	async fetch(req) {
+	async fetch(req, server) {
 		const url = new URL(req.url);
 
 		// CORS headers
@@ -34,6 +33,18 @@ const server = Bun.serve({
 			});
 		}
 
+		// Check if this is a WebSocket upgrade request
+		const upgrade = req.headers.get('upgrade');
+		if (upgrade === 'websocket') {
+			const success = server.upgrade(req);
+			if (success) {
+				// Upgrade was successful, don't return a response
+				return undefined;
+			}
+			// Upgrade failed
+			return new Response('Upgrade failed', { status: 400 });
+		}
+
 		// Try to handle with router
 		const response = await router.handle(req);
 		if (response) {
@@ -42,7 +53,6 @@ const server = Bun.serve({
 			Object.entries(corsHeaders).forEach(([key, value]) => {
 				headers.set(key, value);
 			});
-
 			return new Response(response.body, {
 				status: response.status,
 				statusText: response.statusText,
@@ -62,6 +72,42 @@ const server = Bun.serve({
 			}
 		);
 	},
+	websocket: {
+		message(ws, message) {
+			try {
+				const data = JSON.parse(message.toString());
+				console.log('Received WebSocket message:', data);
+
+				// Echo the message back to all connected clients
+				server.publish('chat', JSON.stringify({
+					type: 'message',
+					data: data,
+					timestamp: new Date().toISOString()
+				}));
+			} catch (error) {
+				console.error('Error parsing WebSocket message:', error);
+				ws.send(JSON.stringify({
+					type: 'error',
+					message: 'Invalid message format'
+				}));
+			}
+		},
+		open(ws) {
+			console.log('WebSocket client connected');
+			// Subscribe to the chat channel
+			ws.subscribe('chat');
+			// Send welcome message
+			ws.send(JSON.stringify({
+				type: 'welcome',
+				message: 'Connected to WebSocket server!',
+				timestamp: new Date().toISOString()
+			}));
+		},
+		close(ws, code, message) {
+			console.log('WebSocket client disconnected:', code, message);
+			ws.unsubscribe('chat');
+		},
+	}
 });
 
 console.log(`🚀 Organized Bun API server running on http://localhost:${server.port}`);
